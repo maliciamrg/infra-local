@@ -4,7 +4,10 @@
   gather_facts: false
 
   vars:
-    # Déclarer ici les datasets à créer
+    # ---------------------------------------------------------
+    # DATASETS ZFS
+    # ---------------------------------------------------------
+
     datasets_to_create:
       # BigBoy : stockage général et applications
       - name: BigBoy/SourceCode
@@ -42,9 +45,11 @@
       - name: Ssd1to/Mail
         comments: "Archives de messagerie, courriers electroniques et donnees associees"
 
-    # Déclarer ici les partages SMB à créer
+    # ---------------------------------------------------------
+    # PARTAGES SMB
+    # ---------------------------------------------------------
+
     shares_to_create:
-      # BigBoy : stockage général et applications
       - name: SourceCode
         path: /mnt/BigBoy/SourceCode
         enabled: true
@@ -75,7 +80,6 @@
         enabled: false
         readonly: false
 
-      # DataSafe : données importantes
       - name: System
         path: /mnt/DataSafe/System
         enabled: true
@@ -91,7 +95,6 @@
         enabled: true
         readonly: false
 
-      # Ssd1to : données utilisateurs et services
       - name: Home
         path: /mnt/Ssd1to/Home
         enabled: true
@@ -102,29 +105,29 @@
         enabled: false
         readonly: false
 
-    # Déclarer ici les partages NFS à créer
+    # ---------------------------------------------------------
+    # PARTAGES NFS
+    # ---------------------------------------------------------
+
     nfs_shares_to_create:
       - path: /mnt/BigBoy/DatabaseBackups
         comment: "Sauvegardes PostgreSQL, MySQL et MariaDB"
-        enabled: true
-        networks:
-          - 192.168.1.0/24
         hosts:
           - 192.168.1.XXX
         ro: false
-        maproot_user: ""
-        maproot_group: ""
-        mapall_user: ""
-        mapall_group: ""
 
   tasks:
+
     # ---------------------------------------------------------
     # SERVICES SMB ET NFS
     # ---------------------------------------------------------
 
     - name: Lire les services TrueNAS
       ansible.builtin.command:
-        argv: ["midclt", "call", "service.query"]
+        argv:
+          - midclt
+          - call
+          - service.query
       register: services_raw
       changed_when: false
 
@@ -137,9 +140,9 @@
         that:
           - "'cifs' in existing_services | map(attribute='service') | list"
           - "'nfs' in existing_services | map(attribute='service') | list"
-        fail_msg: "Le service SMB ou NFS est introuvable dans TrueNAS."
+        fail_msg: "Service SMB ou NFS introuvable dans TrueNAS."
 
-    - name: Activer le démarrage automatique de SMB et NFS
+    - name: Activer le démarrage automatique des services
       ansible.builtin.command:
         argv:
           - midclt
@@ -150,10 +153,19 @@
       loop:
         - cifs
         - nfs
-      register: service_enable
+      loop_control:
+        label: "{{ item }}"
+      when: >-
+        not (
+          existing_services
+          | selectattr('service', 'equalto', item)
+          | map(attribute='enable')
+          | first
+          | default(false)
+        )
       changed_when: true
 
-    - name: Démarrer SMB et NFS
+    - name: Démarrer les services arrêtés
       ansible.builtin.command:
         argv:
           - midclt
@@ -163,25 +175,34 @@
       loop:
         - cifs
         - nfs
-      register: service_start
+      loop_control:
+        label: "{{ item }}"
+      when: >-
+        (
+          existing_services
+          | selectattr('service', 'equalto', item)
+          | map(attribute='state')
+          | first
+          | default('STOPPED')
+        ) != 'RUNNING'
       changed_when: true
+
+    # ---------------------------------------------------------
+    # DATASETS ZFS
+    # ---------------------------------------------------------
 
     - name: Lire les datasets existants
       ansible.builtin.command:
-        argv: ["midclt", "call", "pool.dataset.query"]
+        argv:
+          - midclt
+          - call
+          - pool.dataset.query
       register: existing_datasets_raw
       changed_when: false
 
-    - name: Lire les partages SMB existants
-      ansible.builtin.command:
-        argv: ["midclt", "call", "sharing.smb.query"]
-      register: existing_shares_raw
-      changed_when: false
-
-    - name: Convertir les inventaires JSON
+    - name: Convertir les datasets
       ansible.builtin.set_fact:
         existing_datasets: "{{ existing_datasets_raw.stdout | from_json }}"
-        existing_shares: "{{ existing_shares_raw.stdout | from_json }}"
 
     - name: Vérifier les pools parents
       ansible.builtin.assert:
@@ -189,6 +210,8 @@
           - item.name.split('/')[0] in existing_datasets | map(attribute='name') | list
         fail_msg: "Le pool parent de {{ item.name }} n'existe pas."
       loop: "{{ datasets_to_create }}"
+      loop_control:
+        label: "{{ item.name }}"
 
     - name: Créer les datasets absents
       ansible.builtin.command:
@@ -203,19 +226,29 @@
       when: item.name not in existing_datasets | map(attribute='name') | list
       register: dataset_creation
 
-    - name: Actualiser les partages SMB après création
+    # ---------------------------------------------------------
+    # PARTAGES SMB
+    # ---------------------------------------------------------
+
+    - name: Actualiser les partages SMB
       ansible.builtin.command:
-        argv: ["midclt", "call", "sharing.smb.query"]
-      register: refreshed_shares_raw
+        argv:
+          - midclt
+          - call
+          - sharing.smb.query
+      register: existing_shares_raw
       changed_when: false
 
-    - name: Convertir les partages actualisés
+    - name: Convertir les partages SMB
       ansible.builtin.set_fact:
-        existing_shares: "{{ refreshed_shares_raw.stdout | from_json }}"
+        existing_shares: "{{ existing_shares_raw.stdout | from_json }}"
 
     - name: Vérifier que les chemins des partages existent
       ansible.builtin.command:
-        argv: ["test", "-d", "{{ item.path }}"]
+        argv:
+          - test
+          - -d
+          - "{{ item.path }}"
       loop: "{{ shares_to_create }}"
       loop_control:
         label: "{{ item.name }}"
@@ -240,12 +273,15 @@
       register: share_creation
 
     # ---------------------------------------------------------
-    # NFS
+    # PARTAGES NFS
     # ---------------------------------------------------------
 
     - name: Lire les partages NFS existants
       ansible.builtin.command:
-        argv: ["midclt", "call", "sharing.nfs.query"]
+        argv:
+          - midclt
+          - call
+          - sharing.nfs.query
       register: existing_nfs_shares_raw
       changed_when: false
 
@@ -255,7 +291,10 @@
 
     - name: Vérifier que les chemins des partages NFS existent
       ansible.builtin.command:
-        argv: ["test", "-d", "{{ item.path }}"]
+        argv:
+          - test
+          - -d
+          - "{{ item.path }}"
       loop: "{{ nfs_shares_to_create }}"
       loop_control:
         label: "{{ item.path }}"
@@ -279,6 +318,10 @@
       when: item.path not in existing_nfs_shares | map(attribute='path') | list
       register: nfs_creation
 
+    # ---------------------------------------------------------
+    # RESUME
+    # ---------------------------------------------------------
+
     - name: Résumé de maintenance
       ansible.builtin.debug:
         msg:
@@ -286,5 +329,6 @@
           - "Datasets : {{ datasets_to_create | length }} vérifiés."
           - "Partages SMB : {{ shares_to_create | length }} vérifiés."
           - "Partages NFS : {{ nfs_shares_to_create | length }} vérifiés."
+          - "Services SMB et NFS : activation demandée."
           - "Aucune suppression effectuée."
           - "Les ressources déjà présentes ont été conservées."
