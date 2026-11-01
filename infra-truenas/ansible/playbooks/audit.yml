@@ -1,0 +1,86 @@
+
+---
+- name: Auditer TrueNAS et générer un rapport Markdown
+  hosts: truenas
+  gather_facts: false
+
+  vars:
+    report_dir: "{{ playbook_dir }}/../../reports"
+    report_file: "{{ report_dir }}/audit-{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}.md"
+    disks_to_scan:
+      - /mnt/BigBoy
+      - /mnt/DataSafe
+      - /mnt/Ssd1to
+    disk_directories: {}
+
+  tasks:
+    - name: Lire les pools ZFS
+      ansible.builtin.command:
+        argv: ["midclt", "call", "pool.query"]
+      register: pools_raw
+      changed_when: false
+
+    - name: Lire les datasets ZFS
+      ansible.builtin.command:
+        argv: ["midclt", "call", "pool.dataset.query"]
+      register: datasets_raw
+      changed_when: false
+
+    - name: Lire les partages SMB
+      ansible.builtin.command:
+        argv: ["midclt", "call", "sharing.smb.query"]
+      register: smb_raw
+      changed_when: false
+
+    - name: Lister les répertoires de premier niveau
+      ansible.builtin.command:
+        argv:
+          - find
+          - "{{ item }}"
+          - -mindepth
+          - "1"
+          - -maxdepth
+          - "1"
+          - -type
+          - d
+          - -printf
+          - "%f\n"
+      loop: "{{ disks_to_scan }}"
+      register: directories_raw
+      changed_when: false
+
+    - name: Construire la liste des répertoires
+      ansible.builtin.set_fact:
+        disk_directories: >-
+          {{
+            disk_directories | combine({
+              item.item: item.stdout_lines | default([])
+            })
+          }}
+      loop: "{{ directories_raw.results }}"
+
+    - name: Créer le dossier reports localement
+      ansible.builtin.file:
+        path: "{{ report_dir }}"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      become: false
+
+    - name: Générer le rapport Markdown
+      ansible.builtin.template:
+        src: ../templates/audit-report.md.j2
+        dest: "{{ report_file }}"
+        mode: "0644"
+      vars:
+        pools: "{{ pools_raw.stdout | from_json }}"
+        datasets: "{{ datasets_raw.stdout | from_json }}"
+        smb_shares: "{{ smb_raw.stdout | from_json }}"
+        disk_directories: "{{ disk_directories }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Afficher le rapport créé
+      ansible.builtin.debug:
+        msg: "Rapport créé : {{ report_file }}"
+

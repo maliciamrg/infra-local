@@ -1,0 +1,51 @@
+# Inventaire observé - instantané, à vérifier avant toute opération.
+# Ne pas utiliser ce fichier comme instruction de création de pools.
+truenas:
+  model: "TerraMaster F4-425"
+  version: "TrueNAS SCALE 25.10.3.1 (Goldeye)"
+
+pools:
+  - name: BigBoy
+    status: ONLINE
+    layout: single-disk
+    redundancy: none
+    used_at_last_check: "1.40T"
+    available_at_last_check: "2.11T"
+    mountpoint: /mnt/BigBoy
+    notes: "Pas de redondance disque."
+
+  - name: DataSafe
+    status: ONLINE
+    layout: mirror
+    redundancy: "tolère la panne d'un disque du miroir"
+    used_at_last_check: "895G"
+    available_at_last_check: "4.32G"
+    mountpoint: /mnt/DataSafe
+    notes: "Quasi saturé au dernier relevé. Libérer de l'espace ou augmenter la capacité avant ajout de données."
+
+  - name: Ssd1to
+    status: ONLINE
+    layout: single-disk
+    redundancy: none
+    used_at_last_check: "360G"
+    available_at_last_check: "500G"
+    mountpoint: /mnt/Ssd1to
+    notes: "Pas de redondance disque."
+
+  - name: boot-pool
+    status: ONLINE
+    role: system
+    notes: "Pool système TrueNAS. Ne pas gérer comme un pool de données."
+
+protected:
+  datasets:
+    - BigBoy/ix-apps
+    - Ssd1to/ix-apps
+    - Ssd1to/.system
+    - DataSafe/paperless-postgres
+  pools:
+    - boot-pool
+
+backup_warning: >
+  Un miroir ZFS n'est pas une sauvegarde. BigBoy et Ssd1to sont des pools
+  sans redondance. Prévoir des sauvegardes indépendantes et testées.

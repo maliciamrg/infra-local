@@ -1,0 +1,46 @@
+---
+- name: Préparer le serveur Ubuntu pour Docker Compose
+  hosts: ubuntu
+  become: true
+
+  vars:
+    app_directories:
+      - /srv/frigate/config
+      - /srv/frigate/storage
+      - /srv/ollama
+      - /srv/paperless/data
+      - /srv/paperless/media
+      - /srv/paperless/export
+      - /srv/paperless/consume
+
+  tasks:
+    - name: Installer les paquets nécessaires
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - cifs-utils
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Activer Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Ajouter l'utilisateur distant au groupe docker
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: true
+
+    - name: Créer les répertoires applicatifs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0750"
+      loop: "{{ app_directories }}"

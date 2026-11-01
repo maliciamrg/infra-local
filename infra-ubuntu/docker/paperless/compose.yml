@@ -1,0 +1,50 @@
+services:
+  broker:
+    image: docker.io/library/redis:7
+    container_name: paperless-redis
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
+  db:
+    image: docker.io/library/postgres:16
+    container_name: paperless-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${PAPERLESS_DB_NAME:-paperless}"
+      POSTGRES_USER: "${PAPERLESS_DB_USER:-paperless}"
+      POSTGRES_PASSWORD: "${PAPERLESS_DB_PASSWORD:?Définir PAPERLESS_DB_PASSWORD dans .env}"
+    volumes:
+      # Volume Docker local : ne pas le déplacer sur un partage SMB/CIFS.
+      - postgresdata:/var/lib/postgresql/data
+
+  webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+    ports:
+      - "${PAPERLESS_PORT:-8000}:8000"
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_DBNAME: "${PAPERLESS_DB_NAME:-paperless}"
+      PAPERLESS_DBUSER: "${PAPERLESS_DB_USER:-paperless}"
+      PAPERLESS_DBPASS: "${PAPERLESS_DB_PASSWORD:?Définir PAPERLESS_DB_PASSWORD dans .env}"
+      PAPERLESS_SECRET_KEY: "${PAPERLESS_SECRET_KEY:?Définir PAPERLESS_SECRET_KEY dans .env}"
+      PAPERLESS_TIME_ZONE: "${PAPERLESS_TIME_ZONE:-Europe/Paris}"
+      PAPERLESS_ADMIN_USER: "${PAPERLESS_ADMIN_USER:-admin}"
+      PAPERLESS_ADMIN_PASSWORD: "${PAPERLESS_ADMIN_PASSWORD:?Définir PAPERLESS_ADMIN_PASSWORD dans .env}"
+      PAPERLESS_OCR_LANGUAGE: fra
+      PAPERLESS_URL: http://localhost:${PAPERLESS_PORT:-8000}
+    volumes:
+      - "${PAPERLESS_DATA_DIR:-/srv/paperless/data}:/usr/src/paperless/data"
+      - "${PAPERLESS_MEDIA_DIR:-/srv/paperless/media}:/usr/src/paperless/media"
+      - "${PAPERLESS_EXPORT_DIR:-/srv/paperless/export}:/usr/src/paperless/export"
+      - "${PAPERLESS_CONSUME_DIR:-/srv/paperless/consume}:/usr/src/paperless/consume"
+
+volumes:
+  postgresdata:
+  redisdata:

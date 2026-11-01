@@ -1,0 +1,46 @@
+
+# Rapport d'audit TrueNAS
+
+- Date : {{ lookup('pipe', 'date --iso-8601=seconds') }}
+- NAS : {{ inventory_hostname }}
+
+## Pools ZFS
+
+| Pool | État | Taille | Utilisé | Disponible |
+|---|---|---:|---:|---:|
+{% for p in pools %}
+| {{ p.name }} | {{ p.status | default('inconnu') }} | {{ p.size | default(0) | int | filesizeformat(true) }} | {{ p.allocated | default(0) | int | filesizeformat(true) }} | {{ p.free | default(0) | int | filesizeformat(true) }} |
+{% endfor %}
+
+## Datasets
+
+| Dataset | Type | Utilisé | Disponible | Mountpoint |
+|---|---|---:|---:|---|
+{% for d in datasets %}
+| {{ d.name }} | {{ d.type | default('') }} | {{ d.used.parsed | default('') }} | {{ d.available.parsed | default('') }} | {{ d.mountpoint.value | default('') }} |
+{% endfor %}
+
+## Partages SMB
+
+| Nom | Chemin | Activé | Lecture seule |
+|---|---|---:|---:|
+{% for s in smb_shares %}
+| {{ s.name }} | {{ s.path }} | {{ 'Oui' if s.enabled else 'Non' }} | {{ 'Oui' if s.ro | default(false) else 'Non' }} |
+{% endfor %}
+
+## Répertoires de premier niveau
+
+{% for disk, directories in (disk_directories | default({})).items() %}
+### {{ disk }}
+
+{% if directories | length > 0 %}
+{% for directory in directories %}
+- {{ directory }}
+{% endfor %}
+{% else %}
+_Aucun répertoire trouvé._
+{% endif %}
+
+{% endfor %}
+---
+Rapport généré automatiquement par Ansible.

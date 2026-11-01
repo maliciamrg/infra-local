@@ -1,0 +1,66 @@
+# Inventaire partiel des datasets ZFS observés.
+# Les répertoires ordinaires vus avec ls ne sont pas nécessairement des datasets.
+datasets:
+  - name: BigBoy
+    mountpoint: /mnt/BigBoy
+    used_at_last_check: "1.40T"
+    available_at_last_check: "2.11T"
+
+  - name: BigBoy/Ftp
+    used_at_last_check: "310G"
+
+  - name: BigBoy/Ftp/Frigate
+    used_at_last_check: "308G"
+    notes: "Données Frigate, vérifier le chemin de stockage réellement utilisé."
+
+  - name: BigBoy/Ftp/Frigate/cache
+    used_at_last_check: "44.2M"
+
+  - name: BigBoy/Ftp/HomeAssistant
+    used_at_last_check: "2.19G"
+    notes: "Le Home Assistant actif est sur le Raspberry Pi selon l'organisation décrite."
+
+  - name: BigBoy/Ollama
+    used_at_last_check: "8.82G"
+
+  - name: BigBoy/Videoclub
+    used_at_last_check: "763G"
+
+  - name: BigBoy/WebSite
+    used_at_last_check: "96K"
+
+  - name: BigBoy/ix-apps
+    mountpoint: /mnt/.ix-apps
+    used_at_last_check: "335M"
+    protected: true
+
+  - name: DataSafe
+    mountpoint: /mnt/DataSafe
+    used_at_last_check: "895G"
+    available_at_last_check: "4.32G"
+
+  - name: DataSafe/paperless-config
+    used_at_last_check: "96K"
+
+  - name: DataSafe/paperless-postgres
+    used_at_last_check: "14.1M"
+    protected: true
+    notes: "Répertoire PostgreSQL observé. Ne pas déplacer ou modifier sans procédure de sauvegarde/restauration cohérente."
+
+  - name: Ssd1to
+    mountpoint: /mnt/Ssd1to
+    used_at_last_check: "360G"
+    available_at_last_check: "500G"
+
+  - name: Ssd1to/.system
+    protected: true
+
+  - name: Ssd1to/ix-apps
+    used_at_last_check: "1.18G"
+    protected: true
+
+# Propriétés observées sur BigBoy/Ftp/Frigate :
+# acltype=posix (hérité), aclmode=discard (hérité),
+# aclinherit=discard (hérité), compression=lz4 (hérité),
+# recordsize=128K.
+# Ne pas propager ces propriétés à d'autres datasets sans étude.

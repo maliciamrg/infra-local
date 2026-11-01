@@ -1,0 +1,22 @@
+services:
+  frigate:
+    container_name: frigate
+    image: ghcr.io/blakeblackshear/frigate:stable
+    restart: unless-stopped
+    shm_size: "256mb"
+    stop_grace_period: 30s
+    ports:
+      - "8971:8971"
+      - "8554:8554"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+    volumes:
+      - "${FRIGATE_CONFIG_DIR:-/srv/frigate/config}:/config"
+      - "${FRIGATE_STORAGE_DIR:-/srv/frigate/storage}:/media/frigate"
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      TZ: "${TZ:-Europe/Paris}"
+    # Exemple d'accélération Intel Quick Sync / VAAPI.
+    # À activer seulement après vérification de /dev/dri sur Ubuntu.
+    # devices:
+    #   - /dev/dri:/dev/dri

@@ -1,0 +1,55 @@
+# Partages SMB relevés via midclt call sharing.smb.query.
+# enabled est volontairement conservé à l'identique.
+smb_shares:
+  - id: 1
+    name: "80-photo"
+    path: "/mnt/DataSafe/80-Photo"
+    enabled: true
+    readonly: false
+    browsable: true
+    comment: ""
+
+  - id: 2
+    name: "70-photocopie"
+    path: "/mnt/DataSafe/70-Photocopie"
+    enabled: false
+    readonly: false
+    browsable: true
+    comment: ""
+
+  - id: 4
+    name: "home"
+    path: "/mnt/Ssd1to/Home"
+    enabled: false
+    readonly: false
+    browsable: true
+    comment: ""
+
+  - id: 5
+    name: "videoclub"
+    path: "/mnt/BigBoy/Videoclub"
+    enabled: true
+    readonly: false
+    browsable: true
+    comment: ""
+
+  - id: 6
+    name: "system"
+    path: "/mnt/BigBoy/System"
+    enabled: true
+    readonly: false
+    browsable: true
+    comment: ""
+
+  - id: 7
+    name: "homeassistant"
+    path: "/mnt/BigBoy/Ftp/HomeAssistant"
+    enabled: true
+    readonly: false
+    browsable: true
+    comment: ""
+
+# Autres options observées : purpose=DEFAULT_SHARE, ABE=false,
+# locked=false, audit désactivé, hostsallow/hostsdeny vides,
+# aapl_name_mangling=false.
+# Les ACL et propriétaires doivent être audités séparément.

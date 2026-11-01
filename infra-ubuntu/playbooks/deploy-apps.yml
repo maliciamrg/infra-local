@@ -1,0 +1,31 @@
+---
+# Déploiement manuel séparé : ce playbook n'est volontairement pas lancé
+# par install.yml. Vérifie les .env et les chemins avant de l'utiliser.
+- name: Déployer les applications Compose
+  hosts: ubuntu
+  become: true
+
+  vars:
+    project_dir: "{{ playbook_dir }}/.."
+
+  tasks:
+    - name: Copier le dépôt vers Ubuntu
+      ansible.builtin.copy:
+        src: "{{ project_dir }}/docker/"
+        dest: /opt/infra-ubuntu/docker/
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: preserve
+
+    - name: Démarrer Frigate
+      community.docker.docker_compose_v2:
+        project_src: /opt/infra-ubuntu/docker/frigate
+        files:
+          - compose.yml
+        state: present
+      environment:
+        FRIGATE_CONFIG_DIR: /srv/frigate/config
+        FRIGATE_STORAGE_DIR: /srv/frigate/storage
+      when: false
+      # Désactivé par défaut : la collection community.docker et les .env
+      # doivent être préparés explicitement avant d'automatiser ce déploiement.

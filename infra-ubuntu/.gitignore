@@ -1,0 +1,14 @@
+# Secrets et variables locales
+.env
+**/.env
+*.vault
+*.key
+*.pem
+inventory/hosts.yml
+
+# Données applicatives
+data/
+media/
+consume/
+export/
+config/secrets/

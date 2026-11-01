@@ -1,0 +1,12 @@
+services:
+  ollama:
+    container_name: ollama
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_HOST_PORT:-11434}:11434"
+    volumes:
+      - "${OLLAMA_DATA_DIR:-/srv/ollama}:/root/.ollama"
+    # Pour GPU NVIDIA, il faut installer/configurer le runtime NVIDIA sur Ubuntu
+    # puis ajouter la réservation GPU documentée par Docker Compose.
+    # Ne décommente pas ce bloc sans avoir préparé les pilotes/runtime.

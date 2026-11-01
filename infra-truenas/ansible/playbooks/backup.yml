@@ -1,0 +1,57 @@
+---
+- name: Sauvegarder l'inventaire TrueNAS
+  hosts: truenas
+  gather_facts: false
+
+  vars:
+    backup_root: "{{ playbook_dir }}/../../snapshots"
+
+  tasks:
+    - name: Définir un timestamp unique
+      ansible.builtin.set_fact:
+        backup_stamp: "{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
+
+    - name: Collecter les pools
+      ansible.builtin.command:
+        argv: ["midclt", "call", "pool.query"]
+      register: pools
+      changed_when: false
+
+    - name: Collecter les datasets
+      ansible.builtin.command:
+        argv: ["midclt", "call", "pool.dataset.query"]
+      register: datasets
+      changed_when: false
+
+    - name: Collecter les partages SMB
+      ansible.builtin.command:
+        argv: ["midclt", "call", "sharing.smb.query"]
+      register: shares
+      changed_when: false
+
+    - name: Créer le dossier de sauvegarde local
+      ansible.builtin.file:
+        path: "{{ backup_root }}/{{ backup_stamp }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+
+    - name: Sauvegarder les données JSON
+      ansible.builtin.copy:
+        content: "{{ item.content | from_json | to_nice_json }}\n"
+        dest: "{{ backup_root }}/{{ backup_stamp }}/{{ item.name }}.json"
+        mode: "0600"
+      loop:
+        - name: pools
+          content: "{{ pools.stdout }}"
+        - name: datasets
+          content: "{{ datasets.stdout }}"
+        - name: smb-shares
+          content: "{{ shares.stdout }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Afficher le dossier de sauvegarde
+      ansible.builtin.debug:
+        msg: "Sauvegarde créée dans {{ backup_root }}/{{ backup_stamp }}"

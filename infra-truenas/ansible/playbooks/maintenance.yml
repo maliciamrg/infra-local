@@ -1,0 +1,290 @@
+---
+- name: Maintenance additive TrueNAS - création uniquement
+  hosts: truenas
+  gather_facts: false
+
+  vars:
+    # Déclarer ici les datasets à créer
+    datasets_to_create:
+      # BigBoy : stockage général et applications
+      - name: BigBoy/SourceCode
+        comments: "Depots Git, codes sources, projets de developpement et configurations versionnees"
+
+      - name: BigBoy/WebSite
+        comments: "Fichiers des sites web, contenus web, medias et ressources publiees"
+
+      - name: BigBoy/Ollama
+        comments: "Modeles IA locaux, fichiers de configuration et donnees Ollama"
+
+      - name: BigBoy/Videoclub
+        comments: "Bibliotheque multimedia, films et series"
+
+      - name: BigBoy/Ftp
+        comments: "Espace de stockage et d'echange de fichiers accessible via FTP"
+
+      - name: BigBoy/DatabaseBackups
+        comments: "Sauvegardes des bases de donnees PostgreSQL, MySQL, MariaDB et autres applications"
+
+      # DataSafe : donnees importantes
+      - name: DataSafe/System
+        comments: "Configurations, fichiers techniques, scripts systeme et parametres des services"
+
+      - name: DataSafe/Photocopie
+        comments: "Documents numerises, photocopies, factures, courriers et archives administratives"
+
+      - name: DataSafe/Photo
+        comments: "Phototheque personnelle, photos originales, albums et archives photographiques"
+
+      # Ssd1to : donnees utilisateurs et services
+      - name: Ssd1to/Home
+        comments: "Repertoires utilisateurs et donnees privees"
+
+      - name: Ssd1to/Mail
+        comments: "Archives de messagerie, courriers electroniques et donnees associees"
+
+    # Déclarer ici les partages SMB à créer
+    shares_to_create:
+      # BigBoy : stockage général et applications
+      - name: SourceCode
+        path: /mnt/BigBoy/SourceCode
+        enabled: true
+        readonly: false
+
+      - name: WebSite
+        path: /mnt/BigBoy/WebSite
+        enabled: true
+        readonly: false
+
+      - name: Ollama
+        path: /mnt/BigBoy/Ollama
+        enabled: true
+        readonly: false
+
+      - name: Videoclub
+        path: /mnt/BigBoy/Videoclub
+        enabled: true
+        readonly: false
+
+      - name: Ftp
+        path: /mnt/BigBoy/Ftp
+        enabled: true
+        readonly: false
+
+      - name: DatabaseBackups
+        path: /mnt/BigBoy/DatabaseBackups
+        enabled: false
+        readonly: false
+
+      # DataSafe : données importantes
+      - name: System
+        path: /mnt/DataSafe/System
+        enabled: true
+        readonly: false
+
+      - name: Photocopie
+        path: /mnt/DataSafe/Photocopie
+        enabled: true
+        readonly: false
+
+      - name: Photo
+        path: /mnt/DataSafe/Photo
+        enabled: true
+        readonly: false
+
+      # Ssd1to : données utilisateurs et services
+      - name: Home
+        path: /mnt/Ssd1to/Home
+        enabled: true
+        readonly: false
+
+      - name: Mail
+        path: /mnt/Ssd1to/Mail
+        enabled: false
+        readonly: false
+
+    # Déclarer ici les partages NFS à créer
+    nfs_shares_to_create:
+      - path: /mnt/BigBoy/DatabaseBackups
+        comment: "Sauvegardes PostgreSQL, MySQL et MariaDB"
+        enabled: true
+        networks:
+          - 192.168.1.0/24
+        hosts:
+          - 192.168.1.XXX
+        ro: false
+        maproot_user: ""
+        maproot_group: ""
+        mapall_user: ""
+        mapall_group: ""
+
+  tasks:
+    # ---------------------------------------------------------
+    # SERVICES SMB ET NFS
+    # ---------------------------------------------------------
+
+    - name: Lire les services TrueNAS
+      ansible.builtin.command:
+        argv: ["midclt", "call", "service.query"]
+      register: services_raw
+      changed_when: false
+
+    - name: Convertir les services
+      ansible.builtin.set_fact:
+        existing_services: "{{ services_raw.stdout | from_json }}"
+
+    - name: Vérifier la présence des services SMB et NFS
+      ansible.builtin.assert:
+        that:
+          - "'cifs' in existing_services | map(attribute='service') | list"
+          - "'nfs' in existing_services | map(attribute='service') | list"
+        fail_msg: "Le service SMB ou NFS est introuvable dans TrueNAS."
+
+    - name: Activer le démarrage automatique de SMB et NFS
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - service.update
+          - "{{ item }}"
+          - '{"enable": true}'
+      loop:
+        - cifs
+        - nfs
+      register: service_enable
+      changed_when: true
+
+    - name: Démarrer SMB et NFS
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - service.start
+          - "{{ item }}"
+      loop:
+        - cifs
+        - nfs
+      register: service_start
+      changed_when: true
+
+    - name: Lire les datasets existants
+      ansible.builtin.command:
+        argv: ["midclt", "call", "pool.dataset.query"]
+      register: existing_datasets_raw
+      changed_when: false
+
+    - name: Lire les partages SMB existants
+      ansible.builtin.command:
+        argv: ["midclt", "call", "sharing.smb.query"]
+      register: existing_shares_raw
+      changed_when: false
+
+    - name: Convertir les inventaires JSON
+      ansible.builtin.set_fact:
+        existing_datasets: "{{ existing_datasets_raw.stdout | from_json }}"
+        existing_shares: "{{ existing_shares_raw.stdout | from_json }}"
+
+    - name: Vérifier les pools parents
+      ansible.builtin.assert:
+        that:
+          - item.name.split('/')[0] in existing_datasets | map(attribute='name') | list
+        fail_msg: "Le pool parent de {{ item.name }} n'existe pas."
+      loop: "{{ datasets_to_create }}"
+
+    - name: Créer les datasets absents
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - pool.dataset.create
+          - "{{ {'name': item.name, 'type': 'FILESYSTEM', 'comments': item.comments | default('')} | to_json }}"
+      loop: "{{ datasets_to_create }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.name not in existing_datasets | map(attribute='name') | list
+      register: dataset_creation
+
+    - name: Actualiser les partages SMB après création
+      ansible.builtin.command:
+        argv: ["midclt", "call", "sharing.smb.query"]
+      register: refreshed_shares_raw
+      changed_when: false
+
+    - name: Convertir les partages actualisés
+      ansible.builtin.set_fact:
+        existing_shares: "{{ refreshed_shares_raw.stdout | from_json }}"
+
+    - name: Vérifier que les chemins des partages existent
+      ansible.builtin.command:
+        argv: ["test", "-d", "{{ item.path }}"]
+      loop: "{{ shares_to_create }}"
+      loop_control:
+        label: "{{ item.name }}"
+      changed_when: false
+
+    - name: Créer les partages SMB absents
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - sharing.smb.create
+          - "{{ {
+              'name': item.name,
+              'path': item.path,
+              'enabled': item.enabled | default(true),
+              'ro': item.readonly | default(false)
+            } | to_json }}"
+      loop: "{{ shares_to_create }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.name not in existing_shares | map(attribute='name') | list
+      register: share_creation
+
+    # ---------------------------------------------------------
+    # NFS
+    # ---------------------------------------------------------
+
+    - name: Lire les partages NFS existants
+      ansible.builtin.command:
+        argv: ["midclt", "call", "sharing.nfs.query"]
+      register: existing_nfs_shares_raw
+      changed_when: false
+
+    - name: Convertir les partages NFS existants
+      ansible.builtin.set_fact:
+        existing_nfs_shares: "{{ existing_nfs_shares_raw.stdout | from_json }}"
+
+    - name: Vérifier que les chemins des partages NFS existent
+      ansible.builtin.command:
+        argv: ["test", "-d", "{{ item.path }}"]
+      loop: "{{ nfs_shares_to_create }}"
+      loop_control:
+        label: "{{ item.path }}"
+      changed_when: false
+
+    - name: Créer les partages NFS absents
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - sharing.nfs.create
+          - "{{ {
+              'path': item.path,
+              'comment': item.comment | default(''),
+              'hosts': item.hosts | default([]),
+              'ro': item.ro | default(false)
+            } | to_json }}"
+      loop: "{{ nfs_shares_to_create }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when: item.path not in existing_nfs_shares | map(attribute='path') | list
+      register: nfs_creation
+
+    - name: Résumé de maintenance
+      ansible.builtin.debug:
+        msg:
+          - "Maintenance additive terminée."
+          - "Datasets : {{ datasets_to_create | length }} vérifiés."
+          - "Partages SMB : {{ shares_to_create | length }} vérifiés."
+          - "Partages NFS : {{ nfs_shares_to_create | length }} vérifiés."
+          - "Aucune suppression effectuée."
+          - "Les ressources déjà présentes ont été conservées."

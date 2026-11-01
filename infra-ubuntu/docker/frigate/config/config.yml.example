@@ -1,0 +1,17 @@
+mqtt:
+  enabled: false
+
+# Remplace cet exemple par tes caméras et leurs flux RTSP.
+cameras:
+  camera_exemple:
+    enabled: false
+    ffmpeg:
+      inputs:
+        - path: rtsp://utilisateur:mot_de_passe@192.168.1.50:554/stream1
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
