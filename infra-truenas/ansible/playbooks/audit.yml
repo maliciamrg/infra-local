@@ -32,6 +32,12 @@
       register: smb_raw
       changed_when: false
 
+    - name: Lire les partages NFS
+      ansible.builtin.command:
+        argv: ["midclt", "call", "sharing.nfs.query"]
+      register: nfs_raw
+      changed_when: false
+
     - name: Lister les répertoires de premier niveau
       ansible.builtin.command:
         argv:
@@ -76,6 +82,7 @@
         pools: "{{ pools_raw.stdout | from_json }}"
         datasets: "{{ datasets_raw.stdout | from_json }}"
         smb_shares: "{{ smb_raw.stdout | from_json }}"
+        nfs_shares: "{{ nfs_raw.stdout | from_json }}"
         disk_directories: "{{ disk_directories }}"
       delegate_to: localhost
       become: false
@@ -83,4 +90,3 @@
     - name: Afficher le rapport créé
       ansible.builtin.debug:
         msg: "Rapport créé : {{ report_file }}"
-

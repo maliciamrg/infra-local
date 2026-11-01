@@ -11,6 +11,10 @@
       ansible.builtin.set_fact:
         backup_stamp: "{{ lookup('pipe', 'date +%Y%m%d-%H%M%S') }}"
 
+    # ---------------------------------------------------------
+    # COLLECTE DES CONFIGURATIONS
+    # ---------------------------------------------------------
+
     - name: Collecter les pools
       ansible.builtin.command:
         argv: ["midclt", "call", "pool.query"]
@@ -28,6 +32,16 @@
         argv: ["midclt", "call", "sharing.smb.query"]
       register: shares
       changed_when: false
+
+    - name: Collecter les partages NFS
+      ansible.builtin.command:
+        argv: ["midclt", "call", "sharing.nfs.query"]
+      register: nfs_shares
+      changed_when: false
+
+    # ---------------------------------------------------------
+    # SAUVEGARDE LOCALE
+    # ---------------------------------------------------------
 
     - name: Créer le dossier de sauvegarde local
       ansible.builtin.file:
@@ -49,9 +63,23 @@
           content: "{{ datasets.stdout }}"
         - name: smb-shares
           content: "{{ shares.stdout }}"
+        - name: nfs-shares
+          content: "{{ nfs_shares.stdout }}"
+      loop_control:
+        label: "{{ item.name }}"
       delegate_to: localhost
       become: false
 
+    # ---------------------------------------------------------
+    # RESUME
+    # ---------------------------------------------------------
+
     - name: Afficher le dossier de sauvegarde
       ansible.builtin.debug:
-        msg: "Sauvegarde créée dans {{ backup_root }}/{{ backup_stamp }}"
+        msg:
+          - "Sauvegarde de l'inventaire TrueNAS terminée."
+          - "Pools : {{ (pools.stdout | from_json) | length }}"
+          - "Datasets : {{ (datasets.stdout | from_json) | length }}"
+          - "Partages SMB : {{ (shares.stdout | from_json) | length }}"
+          - "Partages NFS : {{ (nfs_shares.stdout | from_json) | length }}"
+          - "Dossier : {{ backup_root }}/{{ backup_stamp }}"

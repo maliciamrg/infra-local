@@ -28,6 +28,18 @@
 | {{ s.name }} | {{ s.path }} | {{ 'Oui' if s.enabled else 'Non' }} | {{ 'Oui' if s.ro | default(false) else 'Non' }} |
 {% endfor %}
 
+## Partages NFS
+
+{% if nfs_shares | length > 0 %}
+| Chemin | Commentaire | Lecture seule | Hôtes autorisés | Réseaux autorisés |
+|---|---|---|---|---|
+{% for share in nfs_shares %}
+| {{ share.path | default('-') }} | {{ share.comment | default('-') }} | {{ share.ro | default(false) }} | {{ (share.hosts | default([])) | join(', ') or '-' }} | {{ (share.networks | default([])) | join(', ') or '-' }} |
+{% endfor %}
+{% else %}
+_Aucun partage NFS configuré._
+{% endif %}
+
 ## Répertoires de premier niveau
 
 {% for disk, directories in (disk_directories | default({})).items() %}
