@@ -35,7 +35,7 @@ ansible -i inventory/hosts.yml ubuntu -m ping
 Puis lance :
 
 ```bash
-ansible-playbook -i inventory/hosts.yml playbooks/install.yml
+ansible-playbook -i inventory/hosts.yml playbooks/install.yml --ask-vault-pass--ask-vault-pass
 ```
 
 Le playbook installe les paquets Ubuntu `docker.io`, `docker-compose-v2` et `cifs-utils`, active Docker et ajoute l'utilisateur Ansible au groupe `docker`.

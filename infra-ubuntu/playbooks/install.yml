@@ -1,25 +1,63 @@
 ---
 - name: Préparer le serveur Ubuntu pour Docker Compose
-  hosts: ubuntu
+  hosts: ubuntu-server
   become: true
 
+  vars_files:
+    - ../group_vars/ubuntu-server/vault.yml
+
   vars:
+    truenas_ip: "192.168.1.111"
+
+    # Identifiants SMB à définir dans un fichier Ansible Vault
+    smb_credentials_file: /root/.smb-truenas-credentials
+
+    # Partages SMB à monter
+    smb_mounts:
+      - name: SourceCode
+        path: /srv/SourceCode
+      - name: WebSite
+        path: /srv/WebSite
+      - name: Ollama
+        path: /srv/Ollama
+      - name: Videoclub
+        path: /srv/Videoclub
+      - name: System
+        path: /srv/System
+      - name: Photocopie
+        path: /srv/Photocopie
+      - name: Photo
+        path: /srv/Photo
+      - name: Home
+        path: /srv/Home
+
+    # Partages NFS à monter
+    nfs_mounts:
+      - remote_path: /mnt/BigBoy/DatabaseBackups
+        local_path: /srv/DatabaseBackups
+
     app_directories:
-      - /srv/frigate/config
-      - /srv/frigate/storage
-      - /srv/ollama
-      - /srv/paperless/data
-      - /srv/paperless/media
-      - /srv/paperless/export
-      - /srv/paperless/consume
+      - /srv/SourceCode
+      - /srv/WebSite
+      - /srv/Ollama
+      - /srv/Videoclub
+      - /srv/System
+      - /srv/Photocopie
+      - /srv/Photo
+      - /srv/Home
+      - /srv/Mail
+      - /srv/DatabaseBackups
 
   tasks:
     - name: Installer les paquets nécessaires
       ansible.builtin.apt:
         name:
-          - docker.io
-          - docker-compose-v2
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
           - cifs-utils
+          - nfs-common
         state: present
         update_cache: true
         cache_valid_time: 3600
@@ -44,3 +82,59 @@
         group: "{{ ansible_user }}"
         mode: "0750"
       loop: "{{ app_directories }}"
+
+    # ---------------------------------------------------------
+    # IDENTIFIANTS SMB
+    # ---------------------------------------------------------
+
+    - name: Vérifier que les identifiants SMB sont définis
+      ansible.builtin.assert:
+        that:
+          - smb_username is defined
+          - smb_password is defined
+        fail_msg: "Définis smb_username et smb_password dans Ansible Vault."
+
+    - name: Créer le fichier d'identifiants SMB
+      ansible.builtin.copy:
+        dest: "{{ smb_credentials_file }}"
+        content: |
+          username={{ smb_username }}
+          password={{ smb_password }}
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    # ---------------------------------------------------------
+    # MONTAGES SMB
+    # ---------------------------------------------------------
+
+    - name: Monter les partages SMB TrueNAS
+      ansible.posix.mount:
+        src: "//{{ truenas_ip }}/{{ item.name }}"
+        path: "{{ item.path }}"
+        fstype: cifs
+        opts: "credentials={{ smb_credentials_file }},vers=3.1.1,iocharset=utf8,_netdev,nofail,x-systemd.automount"
+        dump: "0"
+        passno: "0"
+        state: mounted
+      loop: "{{ smb_mounts }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    # ---------------------------------------------------------
+    # MONTAGES NFS
+    # ---------------------------------------------------------
+
+    - name: Monter les partages NFS TrueNAS
+      ansible.posix.mount:
+        src: "{{ truenas_ip }}:{{ item.remote_path }}"
+        path: "{{ item.local_path }}"
+        fstype: nfs4
+        opts: "rw,hard,_netdev,nofail,x-systemd.automount"
+        dump: "0"
+        passno: "0"
+        state: mounted
+      loop: "{{ nfs_mounts }}"
+      loop_control:
+        label: "{{ item.remote_path }}"
