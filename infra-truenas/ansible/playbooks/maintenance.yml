@@ -4,6 +4,9 @@
   gather_facts: false
 
   vars:
+
+    ubuntu_server_ip: "192.168.1.35"  # À remplacer par l'adresse IP de votre serveur Ubuntu
+
     # ---------------------------------------------------------
     # DATASETS ZFS
     # ---------------------------------------------------------
@@ -24,6 +27,9 @@
 
       - name: BigBoy/Ftp
         comments: "Espace de stockage et d'echange de fichiers accessible via FTP"
+
+      - name: BigBoy/HomeAssistant
+        comments: "Backup et donnees de l'application domotique Home Assistant"
 
       - name: BigBoy/DatabaseBackups
         comments: "Sauvegardes des bases de donnees PostgreSQL, MySQL, MariaDB et autres applications"
@@ -53,57 +59,46 @@
       - name: SourceCode
         path: /mnt/BigBoy/SourceCode
         enabled: true
-        readonly: false
 
       - name: WebSite
         path: /mnt/BigBoy/WebSite
         enabled: true
-        readonly: false
 
       - name: Ollama
         path: /mnt/BigBoy/Ollama
         enabled: true
-        readonly: false
 
       - name: Videoclub
         path: /mnt/BigBoy/Videoclub
         enabled: true
-        readonly: false
 
       - name: Ftp
         path: /mnt/BigBoy/Ftp
         enabled: true
-        readonly: false
 
-      - name: DatabaseBackups
-        path: /mnt/BigBoy/DatabaseBackups
-        enabled: false
-        readonly: false
+      - name: HomeAssistant
+        path: /mnt/BigBoy/HomeAssistant
+        enabled: true
 
       - name: System
         path: /mnt/DataSafe/System
         enabled: true
-        readonly: false
 
       - name: Photocopie
         path: /mnt/DataSafe/Photocopie
         enabled: true
-        readonly: false
 
       - name: Photo
         path: /mnt/DataSafe/Photo
         enabled: true
-        readonly: false
 
       - name: Home
         path: /mnt/Ssd1to/Home
         enabled: true
-        readonly: false
 
       - name: Mail
         path: /mnt/Ssd1to/Mail
         enabled: false
-        readonly: false
 
     # ---------------------------------------------------------
     # PARTAGES NFS
@@ -113,7 +108,7 @@
       - path: /mnt/BigBoy/DatabaseBackups
         comment: "Sauvegardes PostgreSQL, MySQL et MariaDB"
         hosts:
-          - 192.168.1.XXX
+          - "{{ ubuntu_server_ip }}"
         ro: false
 
   tasks:
@@ -263,8 +258,7 @@
           - "{{ {
               'name': item.name,
               'path': item.path,
-              'enabled': item.enabled | default(true),
-              'ro': item.readonly | default(false)
+              'enabled': item.enabled | default(true)
             } | to_json }}"
       loop: "{{ shares_to_create }}"
       loop_control:
@@ -300,6 +294,43 @@
         label: "{{ item.path }}"
       changed_when: false
 
+    - name: Supprimer les partages NFS dont les IP sont différentes
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - sharing.nfs.delete
+          - "{{ existing_nfs_share.id | string }}"
+      vars:
+        existing_nfs_share: >-
+          {{
+            existing_nfs_shares
+            | selectattr('path', 'equalto', item.path)
+            | list
+            | first
+            | default({})
+          }}
+      loop: "{{ nfs_shares_to_create }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when:
+        - existing_nfs_share | length > 0
+        - (existing_nfs_share.hosts | default([]) | sort) != (item.hosts | default([]) | sort)
+      register: nfs_deletion
+
+    - name: Recharger les partages NFS après suppression
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - sharing.nfs.query
+      register: existing_nfs_shares_raw
+      changed_when: false
+
+    - name: Mettre à jour la liste des partages NFS
+      ansible.builtin.set_fact:
+        existing_nfs_shares: "{{ existing_nfs_shares_raw.stdout | from_json }}"
+
     - name: Créer les partages NFS absents
       ansible.builtin.command:
         argv:
@@ -315,7 +346,7 @@
       loop: "{{ nfs_shares_to_create }}"
       loop_control:
         label: "{{ item.path }}"
-      when: item.path not in existing_nfs_shares | map(attribute='path') | list
+      when: item.path not in (existing_nfs_shares | map(attribute='path') | list)
       register: nfs_creation
 
     # ---------------------------------------------------------
