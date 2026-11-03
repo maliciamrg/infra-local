@@ -81,7 +81,7 @@
         enabled: true
 
       - name: System
-        path: /mnt/DataSafe/System
+        path: /mnt/BigBoy/System
         enabled: true
 
       - name: Photocopie
@@ -225,7 +225,7 @@
     # PARTAGES SMB
     # ---------------------------------------------------------
 
-    - name: Actualiser les partages SMB
+    - name: Lire les partages SMB existants
       ansible.builtin.command:
         argv:
           - midclt
@@ -238,7 +238,7 @@
       ansible.builtin.set_fact:
         existing_shares: "{{ existing_shares_raw.stdout | from_json }}"
 
-    - name: Vérifier que les chemins des partages existent
+    - name: Vérifier que les chemins des partages SMB existent
       ansible.builtin.command:
         argv:
           - test
@@ -249,6 +249,43 @@
         label: "{{ item.name }}"
       changed_when: false
 
+    - name: Supprimer les partages SMB dont le chemin a changé
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - sharing.smb.delete
+          - "{{ existing_smb_share.id | string }}"
+      vars:
+        existing_smb_share: >-
+          {{
+            existing_shares
+            | selectattr('name', 'equalto', item.name)
+            | list
+            | first
+            | default({})
+          }}
+      loop: "{{ shares_to_create }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when:
+        - existing_smb_share | length > 0
+        - existing_smb_share.path != item.path
+      register: smb_deletion
+
+    - name: Recharger les partages SMB après suppression
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - sharing.smb.query
+      register: existing_shares_raw
+      changed_when: false
+
+    - name: Actualiser la liste des partages SMB
+      ansible.builtin.set_fact:
+        existing_shares: "{{ existing_shares_raw.stdout | from_json }}"
+
     - name: Créer les partages SMB absents
       ansible.builtin.command:
         argv:
@@ -256,15 +293,27 @@
           - call
           - sharing.smb.create
           - "{{ {
-              'name': item.name,
-              'path': item.path,
-              'enabled': item.enabled | default(true)
-            } | to_json }}"
+            'name': item.name,
+            'path': item.path,
+            'enabled': item.enabled | default(true)
+          } | to_json }}"
       loop: "{{ shares_to_create }}"
       loop_control:
         label: "{{ item.name }}"
-      when: item.name not in existing_shares | map(attribute='name') | list
+      when: >-
+        item.name | lower not in
+        (existing_shares | map(attribute='name') | map('lower') | list)
       register: share_creation
+
+    - name: Redémarrer le service SMB après modification des partages
+      ansible.builtin.command:
+        argv:
+          - midclt
+          - call
+          - service.restart
+          - cifs
+      when: smb_deletion.changed or share_creation.changed
+      changed_when: true
 
     # ---------------------------------------------------------
     # PARTAGES NFS
@@ -360,6 +409,7 @@
           - "Datasets : {{ datasets_to_create | length }} vérifiés."
           - "Partages SMB : {{ shares_to_create | length }} vérifiés."
           - "Partages NFS : {{ nfs_shares_to_create | length }} vérifiés."
-          - "Services SMB et NFS : activation demandée."
+          - "Les partages SMB/NFS modifiés sont recréés si nécessaire."
+          - "Les datasets et les données existantes ne sont pas supprimés."
           - "Aucune suppression effectuée."
           - "Les ressources déjà présentes ont été conservées."
