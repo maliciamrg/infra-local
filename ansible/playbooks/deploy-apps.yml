@@ -1,12 +1,11 @@
 ---
-# Déploiement manuel séparé : ce playbook n'est volontairement pas lancé
-# par install.yml. Vérifie les .env et les chemins avant de l'utiliser.
+# Ce playbook est lancé après install.yml par le playbook site.yml.
 - name: Déployer les applications Compose
   hosts: ubuntu
   become: true
 
   vars:
-    project_dir: "{{ playbook_dir }}/.."
+    project_dir: "{{ playbook_dir }}/../../"
 
   tasks:
     - name: Copier le dépôt vers Ubuntu

@@ -1,0 +1,6 @@
+---
+- import_playbook: backup.yml
+- import_playbook: maintenance.yml
+- import_playbook: audit.yml
+- import_playbook: install.yml
+- import_playbook: deploy-apps.yml

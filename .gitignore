@@ -1,3 +1,10 @@
 /.idea/
-/infra-truenas/reports/
-/infra-truenas/snapshots/
+/reports/
+/snapshots/
+/ansible/inventory/hosts.yml
+.env
+*.key
+*.pem
+*.secret
+*.credentials
+*.password

@@ -1,0 +1,13 @@
+all:
+  children:
+    truenas:
+      hosts:
+        nas:
+          ansible_host: 192.168.1.10  # À remplacer
+          ansible_user: administrateur
+          ansible_python_interpreter: auto_silent
+    ubuntu:
+      hosts:
+        ubuntu-server:
+          ansible_host: 192.168.1.35  # À remplacer
+          ansible_user: ton_utilisateur

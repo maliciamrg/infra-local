@@ -1,6 +1,6 @@
 ---
 - name: Préparer le serveur Ubuntu pour Docker Compose
-  hosts: ubuntu-server
+  hosts: ubuntu
   become: true
 
   vars_files:

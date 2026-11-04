@@ -1,7 +1,0 @@
-all:
-  children:
-    ubuntu:
-      hosts:
-        ubuntu-server:
-          ansible_host: 192.168.1.100  # À remplacer
-          ansible_user: ton_utilisateur
