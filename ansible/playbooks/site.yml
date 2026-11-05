@@ -4,3 +4,4 @@
 - import_playbook: audit.yml
 - import_playbook: install.yml
 - import_playbook: deploy-apps.yml
+- import_playbook: 3d-printer.yml

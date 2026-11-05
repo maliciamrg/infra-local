@@ -11,3 +11,9 @@ all:
         ubuntu-server:
           ansible_host: 192.168.1.35  # À remplacer
           ansible_user: ton_utilisateur
+    3d_printer:
+      hosts:
+        colossus:
+          ansible_host: 192.168.1.100  # À remplacer
+          ansible_user: ton_utilisateur
+          ansible_python_interpreter: /usr/bin/python3

@@ -7,10 +7,11 @@ root-level Ansible project:
 - `ansible/`: shared inventory, ordered playbooks, templates, and collections
 - `docker/`: Ubuntu Compose services (Frigate, Ollama, Paperless-ngx)
 
-Treat TrueNAS and Ubuntu as separate operational areas. TrueNAS plays must
-target only the `truenas` inventory group; Ubuntu plays must target only
-`ubuntu`. Keep their workflow order: TrueNAS backup, maintenance, audit;
-Ubuntu install, then application deployment.
+Treat TrueNAS, Ubuntu, and the 3D printer as separate operational areas.
+TrueNAS plays must target only the `truenas` inventory group; Ubuntu plays
+must target only `ubuntu`; printer plays must target only `3d_printer`. Keep
+the workflow order: TrueNAS backup, maintenance, audit; Ubuntu install, then
+application deployment; then 3D printer setup.
 
 ## Operating rules
 - Prefer documentation edits and example configuration files over live secrets.
@@ -22,6 +23,9 @@ Ubuntu install, then application deployment.
   explicit authorization before running or changing it.
 - Prefer idempotent Ubuntu Ansible/Docker Compose changes and clearly
   documented local overrides.
+- The 3D printer playbook must not run against Ubuntu or TrueNAS hosts. Keep
+  its machine-specific `printer.cfg` out of generated defaults and document
+  that Klipper requires a valid config and the correct MCU serial.
 
 ## Ubuntu and Docker guidance
 - Ansible configures Ubuntu packages, Docker, and working directories.
