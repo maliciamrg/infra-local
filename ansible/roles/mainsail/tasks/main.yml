@@ -1,0 +1,42 @@
+---
+- name: Télécharger Mainsail
+  ansible.builtin.get_url:
+    url: https://github.com/mainsail-crew/mainsail/releases/latest/download/mainsail.zip
+    dest: /tmp/mainsail.zip
+    mode: "0644"
+- name: Créer racine web
+  ansible.builtin.file:
+    path: "{{ mainsail_root }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0755"
+- name: Déployer fichiers Mainsail
+  ansible.builtin.unarchive:
+    src: /tmp/mainsail.zip
+    dest: "{{ mainsail_root }}"
+    remote_src: true
+    owner: www-data
+    group: www-data
+- name: Configurer Nginx
+  ansible.builtin.template:
+    src: mainsail.nginx.j2
+    dest: /etc/nginx/sites-available/mainsail
+    mode: "0644"
+- name: Activer le site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/mainsail
+    dest: /etc/nginx/sites-enabled/mainsail
+    state: link
+- name: Désactiver le site par défaut
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+- name: Tester la configuration Nginx
+  ansible.builtin.command: nginx -t
+  changed_when: false
+- name: Démarrer/recharger Nginx
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: restarted

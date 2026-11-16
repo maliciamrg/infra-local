@@ -1,0 +1,36 @@
+---
+- name: Cloner Moonraker
+  ansible.builtin.git:
+    repo: "{{ moonraker_repo }}"
+    dest: "{{ printer_home }}/moonraker"
+    version: master
+    update: true
+  become_user: "{{ printer_user }}"
+- name: Créer venv Moonraker
+  ansible.builtin.command:
+    cmd: python3 -m venv "{{ printer_home }}/moonraker-env"
+    creates: "{{ printer_home }}/moonraker-env/bin/python"
+  become_user: "{{ printer_user }}"
+- name: Installer dépendances Moonraker
+  ansible.builtin.pip:
+    requirements: "{{ printer_home }}/moonraker/scripts/moonraker-requirements.txt"
+    virtualenv: "{{ printer_home }}/moonraker-env"
+  become_user: "{{ printer_user }}"
+- name: Déployer moonraker.conf
+  ansible.builtin.template:
+    src: moonraker.conf.j2
+    dest: "{{ printer_data }}/config/moonraker.conf"
+    owner: "{{ printer_user }}"
+    group: "{{ printer_user }}"
+    mode: "0640"
+- name: Installer unité Moonraker
+  ansible.builtin.template:
+    src: moonraker.service.j2
+    dest: /etc/systemd/system/moonraker.service
+    mode: "0644"
+- name: Activer Moonraker
+  ansible.builtin.systemd:
+    name: moonraker
+    enabled: true
+    state: started
+    daemon_reload: true

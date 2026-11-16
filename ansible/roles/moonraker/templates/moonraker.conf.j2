@@ -1,0 +1,21 @@
+[server]
+host: 0.0.0.0
+port: {{ moonraker_port }}
+klippy_uds_address: {{ printer_data }}/comms/klippy.sock
+[authorization]
+trusted_clients:
+    {{ moonraker_lan_subnet }}
+    127.0.0.0/8
+    ::1/128
+cors_domains:
+    *.lan
+    *.local
+    *://localhost
+    *://localhost:*
+    *://my.mainsail.xyz
+    *://app.fluidd.xyz
+[octoprint_compat]
+[history]
+[update_manager]
+channel: dev
+refresh_interval: 168

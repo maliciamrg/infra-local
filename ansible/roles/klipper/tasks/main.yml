@@ -1,0 +1,57 @@
+---
+- name: Cloner Klipper
+  ansible.builtin.git:
+    repo: "{{ klipper_repo }}"
+    dest: "{{ printer_home }}/klipper"
+    version: master
+    update: true
+  become_user: "{{ printer_user }}"
+- name: Créer venv Klipper
+  ansible.builtin.command:
+    cmd: python3 -m venv "{{ printer_home }}/klippy-env"
+    creates: "{{ printer_home }}/klippy-env/bin/python"
+  become_user: "{{ printer_user }}"
+- name: Installer dépendances Klipper
+  ansible.builtin.pip:
+    requirements: "{{ printer_home }}/klipper/scripts/klippy-requirements.txt"
+    virtualenv: "{{ printer_home }}/klippy-env"
+  become_user: "{{ printer_user }}"
+- name: Déployer printer.cfg
+  ansible.builtin.template:
+    src: printer.cfg.j2
+    dest: "{{ printer_data }}/config/printer.cfg"
+    owner: "{{ printer_user }}"
+    group: "{{ printer_user }}"
+    mode: "0640"
+- name: Détecter mainsail.cfg existant
+  ansible.builtin.stat:
+    path: /root/printer_data/config/mainsail.cfg
+  register: old_mainsail
+- name: Préserver mainsail.cfg existant
+  ansible.builtin.copy:
+    src: /root/printer_data/config/mainsail.cfg
+    dest: "{{ printer_data }}/config/mainsail.cfg"
+    remote_src: true
+    owner: "{{ printer_user }}"
+    group: "{{ printer_user }}"
+    mode: "0640"
+  when: old_mainsail.stat.exists
+- name: Fournir mainsail.cfg minimal si absent
+  ansible.builtin.copy:
+    src: mainsail.cfg
+    dest: "{{ printer_data }}/config/mainsail.cfg"
+    owner: "{{ printer_user }}"
+    group: "{{ printer_user }}"
+    mode: "0640"
+  when: not old_mainsail.stat.exists
+- name: Installer unité Klipper
+  ansible.builtin.template:
+    src: klipper.service.j2
+    dest: /etc/systemd/system/klipper.service
+    mode: "0644"
+- name: Activer Klipper
+  ansible.builtin.systemd:
+    name: klipper
+    enabled: true
+    state: started
+    daemon_reload: true

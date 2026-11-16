@@ -1,14 +1,10 @@
-
----
-printer_hostname: colossus
-
-klipper_user: klipper
-klipper_home: /home/klipper
-
+printer_user: klipper
+printer_home: /home/klipper
+printer_data: /home/klipper/printer_data
+printer_serial: /dev/serial/by-id/usb-1a86_USB_Serial-if00-port0
+# Adapter au LAN réel si différent.
+moonraker_lan_subnet: "192.168.1.0/24"
+moonraker_port: 7125
+mainsail_root: /var/www/mainsail
 klipper_repo: https://github.com/Klipper3d/klipper.git
 moonraker_repo: https://github.com/Arksine/moonraker.git
-
-printer_serial: /dev/serial/by-id/usb-1a86_USB_Serial-if00-port0
-
-# À adapter à ton réseau local !
-lan_subnet: "192.168.1.0/24"
