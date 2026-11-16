@@ -16,13 +16,42 @@
     requirements: "{{ printer_home }}/klipper/scripts/klippy-requirements.txt"
     virtualenv: "{{ printer_home }}/klippy-env"
   become_user: "{{ printer_user }}"
-- name: Déployer printer.cfg
+- name: Détecter la configuration Klipper existante
+  ansible.builtin.stat:
+    path: "{{ printer_data }}/config/printer.cfg"
+  register: printer_config_before
+- name: Détecter la configuration Klipper historique
+  ansible.builtin.stat:
+    path: /root/printer_data/config/printer.cfg
+  register: legacy_printer_config
+- name: Migrer la configuration Klipper historique
+  ansible.builtin.copy:
+    src: /root/printer_data/config/printer.cfg
+    dest: "{{ printer_data }}/config/printer.cfg"
+    remote_src: true
+    owner: "{{ printer_user }}"
+    group: "{{ printer_user }}"
+    mode: "0640"
+  when:
+    - not printer_config_before.stat.exists
+    - legacy_printer_config.stat.exists
+- name: Créer une configuration Klipper de départ si absente
   ansible.builtin.template:
     src: printer.cfg.j2
     dest: "{{ printer_data }}/config/printer.cfg"
     owner: "{{ printer_user }}"
     group: "{{ printer_user }}"
     mode: "0640"
+  when:
+    - not printer_config_before.stat.exists
+    - not legacy_printer_config.stat.exists
+- name: Vérifier la configuration Klipper requise
+  ansible.builtin.stat:
+    path: "{{ printer_data }}/config/printer.cfg"
+  register: printer_config
+- name: Vérifier l'approbation explicite de la configuration
+  ansible.builtin.set_fact:
+    printer_config_ready: "{{ printer_config.stat.exists and printer_config_approved | bool }}"
 - name: Détecter mainsail.cfg existant
   ansible.builtin.stat:
     path: /root/printer_data/config/mainsail.cfg
@@ -52,6 +81,14 @@
 - name: Activer Klipper
   ansible.builtin.systemd:
     name: klipper
-    enabled: true
-    state: started
+    enabled: "{{ printer_config_ready }}"
+    state: "{{ 'started' if printer_config_ready else 'stopped' }}"
     daemon_reload: true
+- name: Indiquer la configuration et approbation requises
+  ansible.builtin.debug:
+    msg: >-
+      Klipper and Moonraker remain stopped until a machine-specific
+      configuration is provided at {{ printer_data }}/config/printer.cfg,
+      verified for this printer, and printer_config_approved is set to true
+      in ansible/group_vars/3d_printer.yml.
+  when: not printer_config_ready

@@ -65,16 +65,55 @@ full workflow. Maintenance can create datasets and shares and enable or start
 SMB/NFS services. The preceding inventory backup and following audit do not
 make those changes reversible.
 
-The Ubuntu deployment playbook currently copies the Compose files to the
-Ubuntu host; starting Frigate remains disabled by default. Review each
-application's `.env.example` and Compose configuration before deploying.
-Keep application data under `/srv` as configured, and keep Paperless
-PostgreSQL data off SMB/CIFS storage.
+The Ubuntu deployment playbook copies the Compose files to the Ubuntu host and
+seeds `/srv/frigate/config/config.yml` from its example without replacing a
+local config. Frigate is configured for the four listed cameras, with NVIDIA
+GPU decoding and TensorRT-backed detection for an RTX 4060. Detection requires
+a compatible ONNX model at `/srv/frigate/config/model_cache/yolo.onnx`; install
+NVIDIA drivers and the NVIDIA Container Toolkit on Ubuntu first. Follow the
+[Frigate ONNX detector guide](https://docs.frigate.video/configuration/object_detectors/#onnx)
+to prepare a compatible model.
 
-The printer playbook installs the software but does not create a
-machine-specific `printer.cfg`. Add the correct configuration at
-`/home/klipper/printer_data/config/printer.cfg` on the printer, including its
-MCU serial path. Klipper will remain stopped until that file exists; rerun the
-playbook after adding it. Moonraker is configured for the `lan_subnet` in
-`ansible/group_vars/3d_printer.yml`; keep the printer on a trusted LAN and do
-not expose its web interface or API directly to the internet.
+The Ubuntu install playbook can install the recommended NVIDIA driver and
+NVIDIA Container Toolkit and configure Docker's NVIDIA runtime. This is
+disabled by default; enable it explicitly with:
+
+```bash
+ansible-playbook ansible/playbooks/install.yml --limit ubuntu --ask-vault-pass -e install_nvidia_container_toolkit=true
+```
+
+This runs the Ubuntu install playbook, including its existing package and
+network-share setup. Docker is restarted if its NVIDIA runtime configuration
+changes. The playbook does not reboot the host; reboot Ubuntu manually if the
+new driver is not active after installation.
+
+Before deploying, create `/opt/infra-ubuntu/docker/frigate/.env` from
+`.env.example`, set each camera's account credentials, and URL-encode special
+characters in passwords. Then enable Frigate explicitly:
+
+```bash
+ansible-playbook ansible/playbooks/deploy-apps.yml --limit ubuntu -e deploy_frigate=true
+```
+
+The camera URLs in the config use RTSP, not the cameras' HTTPS administration
+pages. Verify RTSP is enabled and test the stream paths for each camera; paths
+can vary by camera firmware or settings. The initial recording policy retains
+motion recordings for seven days. Review it and each application's
+`.env.example` and Compose configuration before deploying. Keep application
+data under `/srv` as configured, and keep Paperless PostgreSQL data off
+SMB/CIFS storage.
+
+If neither config exists, the printer playbook creates an incomplete starter
+`printer.cfg` using `printer_serial` from
+`ansible/group_vars/3d_printer.yml`; it does not guess the printer's hardware
+settings. Fill in and verify the exact machine configuration at
+`/home/klipper/printer_data/config/printer.cfg`. An existing file is preserved;
+if a legacy config exists at
+`/root/printer_data/config/printer.cfg`, the playbook copies it to the new
+location. Set `printer_config_approved: true` in
+`ansible/group_vars/3d_printer.yml` only after verifying the file for this
+printer. The default is false, so Klipper and Moonraker remain stopped and
+disabled until the config is approved and the playbook is rerun. Moonraker
+listens on localhost only and is reached through the Mainsail Nginx proxy.
+Restrict web access to the trusted LAN using the host/network firewall; do not
+expose the interface to the internet.

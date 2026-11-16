@@ -1,8 +1,8 @@
 printer_user: klipper
 printer_home: /home/klipper
 printer_data: /home/klipper/printer_data
+printer_config_approved: false
 printer_serial: /dev/serial/by-id/usb-1a86_USB_Serial-if00-port0
-# Adapter au LAN réel si différent.
 moonraker_lan_subnet: "192.168.1.0/24"
 moonraker_port: 7125
 mainsail_root: /var/www/mainsail

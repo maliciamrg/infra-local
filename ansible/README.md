@@ -1,36 +1,38 @@
-# Ansible — Ender 3X / Klipper / Moonraker / Mainsail
+# Printer Ansible roles
 
-Installation native Ubuntu sous `/home/klipper`. Aucun flash MCU n'est effectué.
+The printer playbook installs Klipper, Moonraker, and Mainsail on the host in
+the `3d_printer` inventory group. It does not flash the MCU or create a printer
+hardware configuration.
 
-## Préparation
-- Confirmer que `/root/backup-klipper-20261106-004712.tar.gz` existe.
-- Adapter `group_vars/3d_printer.yml`, surtout `moonraker_lan_subnet` (valeur initiale `192.168.1.0/24`, à vérifier).
-- L'inventaire est configuré pour exécuter Ansible directement sur colossus (`ansible_connection=local`).
+## Configure and run
 
-Installer Ansible si nécessaire : `sudo apt update && sudo apt install -y ansible`
+From the repository root, set the printer host's SSH details in
+`ansible/inventory/hosts.yml` and review `ansible/group_vars/3d_printer.yml`,
+including the trusted LAN subnet. Install the collections listed in
+`ansible/requirements.yml` with
+`ansible-galaxy collection install -r ansible/requirements.yml`, then run:
 
-## Vérification et exécution
 ```bash
-cd ansible-3d-printer
-ansible 3d_printer -m ping
-ansible-playbook --syntax-check playbooks/site.yml
-ansible-playbook playbooks/site.yml
+ansible-playbook ansible/playbooks/3d-printer.yml --syntax-check
+ansible-playbook ansible/playbooks/3d-printer.yml --limit 3d_printer
 ```
 
-## Accès après déploiement
-- Mainsail : `http://IP_DE_COLLOSSUS/`
-- Moonraker : `http://IP_DE_COLLOSSUS:7125` (LAN uniquement)
+If neither the current nor legacy config exists, the playbook creates a starter
+`printer.cfg` containing the configured `printer_serial` and comments for the
+missing hardware sections. This is not a complete printer config. Fill in and
+verify the exact board and hardware settings, then set
+`printer_config_approved: true` in `ansible/group_vars/3d_printer.yml` before
+expecting Klipper and Moonraker to start. The approval defaults to false, so
+even an existing config is not started without explicit operator approval.
+Existing files are preserved. If the legacy
+`/root/printer_data/config/printer.cfg` exists and the new path does not, the
+playbook copies it to the new path but does not approve or start it.
 
-Vérifier :
-```bash
-systemctl status klipper moonraker nginx --no-pager
-journalctl -u klipper -u moonraker -n 80 --no-pager
-```
+Mainsail is served by Nginx on port 80. Moonraker listens on localhost only;
+access it through Mainsail's Nginx proxy, not directly on port 7125. Restrict
+access to the Mainsail web server to the trusted LAN using the host/network
+firewall, and do not expose it to the Internet.
 
-## Précautions
-- Le playbook copie l'ancien printer.cfg en `printer.cfg.before-ansible` et ne supprime pas `/root/printer_data`.
-- Il reprend le fichier `mainsail.cfg` existant s'il est présent.
-- Contrôler axes, endstops, températures et sens des mouvements avant impression.
-- Le Z-offset et la première couche restent à calibrer manuellement. Ne pas lancer d'impression sans contrôle.
-- Ne pas exposer le port Moonraker 7125 sur Internet.
-- Cette version ne migre ni gcodes ni historiques, et n'installe pas Frigate.
+Before printing, verify the MCU serial, board and wiring settings, axes,
+endstops, temperatures, and movement direction. Calibrate Z-offset and the
+first layer manually. The playbook does not migrate gcodes or history.

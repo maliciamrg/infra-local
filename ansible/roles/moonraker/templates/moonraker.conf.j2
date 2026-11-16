@@ -1,5 +1,5 @@
 [server]
-host: 0.0.0.0
+host: 127.0.0.1
 port: {{ moonraker_port }}
 klippy_uds_address: {{ printer_data }}/comms/klippy.sock
 [authorization]
@@ -8,14 +8,21 @@ trusted_clients:
     127.0.0.0/8
     ::1/128
 cors_domains:
+    http://{{ ansible_host }}
+    http://{{ inventory_hostname }}
     *.lan
     *.local
     *://localhost
     *://localhost:*
     *://my.mainsail.xyz
     *://app.fluidd.xyz
+[file_manager]
+enable_object_processing: True
 [octoprint_compat]
 [history]
+[announcements]
 [update_manager]
+enable_system_updates: False
+enable_packagekit: False
 channel: dev
 refresh_interval: 168

@@ -1,17 +1,82 @@
 mqtt:
   enabled: false
 
-# Remplace cet exemple par tes caméras et leurs flux RTSP.
+ffmpeg:
+  hwaccel_args: preset-nvidia
+
+detectors:
+  onnx:
+    type: onnx
+
+model:
+  path: /config/model_cache/yolo.onnx
+  labelmap_path: /labelmap/coco-80.txt
+  input_tensor: nchw
+  input_pixel_format: rgb
+  input_dtype: float
+  width: 320
+  height: 320
+  model_type: yolo-generic
+
+go2rtc:
+  streams:
+    dome01_main: "rtsp://{FRIGATE_DOME01_USER}:{FRIGATE_DOME01_PASSWORD}@192.168.1.51:554/h264Preview_01_main"
+    dome01_sub: "rtsp://{FRIGATE_DOME01_USER}:{FRIGATE_DOME01_PASSWORD}@192.168.1.51:554/h264Preview_01_sub"
+    garage_main: "rtsp://{FRIGATE_GARAGE_USER}:{FRIGATE_GARAGE_PASSWORD}@192.168.1.52:554/h264Preview_01_main"
+    garage_sub: "rtsp://{FRIGATE_GARAGE_USER}:{FRIGATE_GARAGE_PASSWORD}@192.168.1.52:554/h264Preview_01_sub"
+    reolink_doorbell_poe_main: "rtsp://{FRIGATE_DOORBELL_USER}:{FRIGATE_DOORBELL_PASSWORD}@192.168.1.50:554/h264Preview_01_main"
+    reolink_doorbell_poe_sub: "rtsp://{FRIGATE_DOORBELL_USER}:{FRIGATE_DOORBELL_PASSWORD}@192.168.1.50:554/h264Preview_01_sub"
+    tapo_tc71_main: "rtsp://{FRIGATE_TAPO_USER}:{FRIGATE_TAPO_PASSWORD}@192.168.1.27:554/stream1"
+    tapo_tc71_sub: "rtsp://{FRIGATE_TAPO_USER}:{FRIGATE_TAPO_PASSWORD}@192.168.1.27:554/stream2"
+
 cameras:
-  camera_exemple:
-    enabled: false
+  dome01:
     ffmpeg:
       inputs:
-        - path: rtsp://utilisateur:mot_de_passe@192.168.1.50:554/stream1
-          roles:
-            - detect
+        - path: rtsp://127.0.0.1:8554/dome01_main
+          input_args: preset-rtsp-restream
+          roles: [record]
+        - path: rtsp://127.0.0.1:8554/dome01_sub
+          input_args: preset-rtsp-restream
+          roles: [detect]
     detect:
-      enabled: true
-      width: 1280
-      height: 720
       fps: 5
+  garage:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/garage_main
+          input_args: preset-rtsp-restream
+          roles: [record]
+        - path: rtsp://127.0.0.1:8554/garage_sub
+          input_args: preset-rtsp-restream
+          roles: [detect]
+    detect:
+      fps: 5
+  reolink_doorbell_poe:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/reolink_doorbell_poe_main
+          input_args: preset-rtsp-restream
+          roles: [record]
+        - path: rtsp://127.0.0.1:8554/reolink_doorbell_poe_sub
+          input_args: preset-rtsp-restream
+          roles: [detect]
+    detect:
+      fps: 5
+  tapo_tc71:
+    ffmpeg:
+      inputs:
+        - path: rtsp://127.0.0.1:8554/tapo_tc71_main
+          input_args: preset-rtsp-restream
+          roles: [record]
+        - path: rtsp://127.0.0.1:8554/tapo_tc71_sub
+          input_args: preset-rtsp-restream
+          roles: [detect]
+    detect:
+      fps: 5
+
+record:
+  enabled: true
+  retain:
+    days: 7
+    mode: motion

@@ -6,6 +6,7 @@
 
   vars:
     project_dir: "{{ playbook_dir }}/../../"
+    deploy_frigate: false
 
   tasks:
     - name: Copier le dépôt vers Ubuntu
@@ -16,6 +17,47 @@
         group: "{{ ansible_user }}"
         mode: preserve
 
+    - name: Ensure Frigate config directory exists
+      ansible.builtin.file:
+        path: /srv/frigate/config
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0750"
+
+    - name: Seed Frigate config without replacing a local config
+      ansible.builtin.copy:
+        src: /opt/infra-ubuntu/docker/frigate/config/config.yml.example
+        dest: /srv/frigate/config/config.yml
+        remote_src: true
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0640"
+        force: false
+
+    - name: Check that the Frigate environment file exists when deployment is enabled
+      ansible.builtin.stat:
+        path: /opt/infra-ubuntu/docker/frigate/.env
+      register: frigate_env_file
+      when: deploy_frigate | bool
+
+    - name: Check that the Frigate ONNX model exists when deployment is enabled
+      ansible.builtin.stat:
+        path: /srv/frigate/config/model_cache/yolo.onnx
+      register: frigate_onnx_model
+      when: deploy_frigate | bool
+
+    - name: Require Frigate environment file and ONNX model before deployment
+      ansible.builtin.assert:
+        that:
+          - frigate_env_file.stat.exists
+          - frigate_onnx_model.stat.exists
+        fail_msg: >-
+          Create /opt/infra-ubuntu/docker/frigate/.env from .env.example and
+          set the camera account credentials. Install a compatible model at
+          /srv/frigate/config/model_cache/yolo.onnx before deploying Frigate.
+      when: deploy_frigate | bool
+
     - name: Démarrer Frigate
       community.docker.docker_compose_v2:
         project_src: /opt/infra-ubuntu/docker/frigate
@@ -25,6 +67,4 @@
       environment:
         FRIGATE_CONFIG_DIR: /srv/frigate/config
         FRIGATE_STORAGE_DIR: /srv/frigate/storage
-      when: false
-      # Désactivé par défaut : la collection community.docker et les .env
-      # doivent être préparés explicitement avant d'automatiser ce déploiement.
+      when: deploy_frigate | bool

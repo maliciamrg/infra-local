@@ -31,6 +31,6 @@
 - name: Activer Moonraker
   ansible.builtin.systemd:
     name: moonraker
-    enabled: true
-    state: started
+    enabled: "{{ printer_config_ready }}"
+    state: "{{ 'started' if printer_config_ready else 'stopped' }}"
     daemon_reload: true
